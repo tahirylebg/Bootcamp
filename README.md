@@ -42,7 +42,8 @@ docker compose down -v
 ```
 
 3. `POST /analyze-text` analyse directement le texte fourni et genere automatiquement l'identifiant en base.
-4. `GET /alerts` affiche les alertes persistantes.
+4. `POST /analyze-recent?limit=10` analyse les 10 derniers evenements avec DeepSeek.
+5. `GET /alerts` affiche les alertes persistantes.
 
 Pour analyser directement une phrase sans connaitre d'identifiant, utiliser `POST /analyze-text` avec:
 
@@ -53,6 +54,8 @@ Pour analyser directement une phrase sans connaitre d'identifiant, utiliser `POS
 ```
 
 Cette route cree et conserve automatiquement l'evenement avant son analyse.
+
+Pour analyser les derniers logs deja importes, utiliser `POST /analyze-recent` avec un parametre `limit`, par exemple `limit=20`. La limite est comprise entre 1 et 100.
 
 Le fournisseur par defaut est DeepSeek. Mettre la cle dans `DEEPSEEK_API_KEY` dans `.env` et conserver `AI_PROVIDER=deepseek`. Le modele utilise par defaut est `deepseek-chat`. Pour tester sans cle, utiliser temporairement `AI_PROVIDER=mock`. Pour Ollama, mettre `AI_PROVIDER=ollama` et verifier que le service Ollama est accessible.
 
@@ -72,3 +75,19 @@ Les conteneurs `api` et `db` sont sur le reseau Docker `bootcamp_net`. L'API joi
 - requetes SQLAlchemy parametrees;
 - base non exposee directement sur l'hote;
 - fournisseur IA selectionnable sans modifier le code.
+
+## 6. Brancher les logs Windows
+
+Avec Docker demarre, lancer PowerShell dans le dossier du projet:
+
+```powershell
+.\scripts\send-windows-logs.ps1 -Count 50
+```
+
+Le script lit les 50 derniers evenements du journal Windows `System`, les convertit en JSON et les envoie a `POST /ingest`. Pour importer davantage d'evenements:
+
+```powershell
+.\scripts\send-windows-logs.ps1 -Count 200
+```
+
+L'import stocke les logs dans PostgreSQL. Pour analyser ensuite un message, utiliser `POST /analyze-text` dans Swagger. L'automatisation continue peut etre ajoutee avec le Planificateur de taches Windows.

@@ -79,6 +79,38 @@ def analyze_text(payload: TextAnalysisRequest, database: Session = Depends(get_d
     return analysis
 
 
+@app.post("/analyze-recent", response_model=list[AnalysisResponse], tags=["analysis"])
+def analyze_recent(
+    limit: int = Query(default=10, ge=1, le=100),
+    database: Session = Depends(get_db),
+) -> list[Analysis]:
+    events = list(database.scalars(
+        select(Event).order_by(Event.created_at.desc(), Event.id.desc()).limit(limit)
+    ))
+    analyses = []
+    settings = get_settings()
+
+    try:
+        for event in events:
+            result = analyze_event(event, settings)
+            analyses.append(Analysis(
+                event_id=event.id,
+                provider=settings.ai_provider,
+                risk_level=result["risk_level"],
+                summary=result["summary"],
+                recommendations=result["recommendations"],
+            ))
+        database.add_all(analyses)
+        database.commit()
+        for analysis in analyses:
+            database.refresh(analysis)
+    except (ValueError, json.JSONDecodeError) as error:
+        database.rollback()
+        raise HTTPException(status_code=502, detail=str(error)) from error
+
+    return analyses
+
+
 @app.get("/alerts", response_model=list[AnalysisResponse], tags=["analysis"])
 def list_alerts(
     risk_level: str | None = Query(default=None, pattern="^(low|medium|high|critical)$"),
