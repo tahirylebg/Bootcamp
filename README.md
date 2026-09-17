@@ -43,6 +43,8 @@ L'API est sans etat: chaque requete ouvre une session SQLAlchemy via `get_db`, e
 
 ## 3. Demonstration Swagger
 
+Pour une demonstration reproductible, importer d'abord le jeu de logs fourni dans `sample_data/demo_logs.json` via `POST /ingest` (5 evenements couvrant les niveaux low a critical). Ce fichier est fixe et versionne, contrairement aux logs Windows reels importes via `send-windows-logs.ps1` (section 9) qui varient selon la machine.
+
 1. `GET /health` confirme que l'API fonctionne.
 2. `POST /events` avec cet exemple:
 
@@ -75,7 +77,13 @@ Pour analyser les derniers logs deja importes, utiliser `POST /analyze-recent` a
 
 ## 4. Fournisseur IA
 
-Le fournisseur par defaut est DeepSeek. Mettre la cle dans `DEEPSEEK_API_KEY` dans `.env` et conserver `AI_PROVIDER=deepseek`. Le modele utilise par defaut est `deepseek-chat`. Pour tester sans cle, utiliser temporairement `AI_PROVIDER=mock`. Pour Ollama, mettre `AI_PROVIDER=ollama` et verifier que le service Ollama est accessible.
+`app.ai.analyze_event` expose un contrat unique (memes entrees, meme forme de sortie `{risk_level, summary, recommendations}`) quel que soit le fournisseur, choisi via `AI_PROVIDER`:
+
+- `deepseek` (par defaut): utilise le SDK `openai` (compatible OpenAI) pointe vers l'API DeepSeek. Mettre la cle dans `DEEPSEEK_API_KEY` dans `.env`. Le modele par defaut est `deepseek-chat`.
+- `ollama`: appelle un serveur Ollama local via HTTP (`OLLAMA_URL`, `OLLAMA_MODEL`); verifier que le service est accessible.
+- `mock`: reponse deterministe sans appel reseau, utile pour tester sans cle API.
+
+Changer de fournisseur ne demande aucune modification du code applicatif.
 
 ## 5. Architecture reseau
 
@@ -104,7 +112,7 @@ python -m venv .venv
 pip install -r requirements-dev.txt
 ```
 
-Lancer les tests unitaires (aucune base de donnees requise, `app.ai.mock_analysis` et les schemas Pydantic sont testes isolement):
+Lancer les tests unitaires (aucune base de donnees ni appel reseau requis: les schemas Pydantic sont testes isolement, et les appels aux clients DeepSeek/Ollama sont simules avec `monkeypatch` pour rester rapides et deterministes):
 
 ```powershell
 pytest
@@ -142,6 +150,6 @@ Avant la demonstration:
 - [ ] `docker compose up --build` demarre sans erreur et `/health` repond `{"status": "ok"}`.
 - [ ] `.env` contient une cle `DEEPSEEK_API_KEY` valide, ou `AI_PROVIDER=mock` en solution de secours si pas de reseau/quota.
 - [ ] `pytest` et `ruff check .` passent tous les deux.
-- [ ] Le script `send-windows-logs.ps1` a ete teste au moins une fois pour avoir des donnees a montrer.
-- [ ] Un jeu d'evenements de demonstration est deja importe (`POST /events` ou `POST /ingest`) pour eviter de saisir des donnees en direct.
+- [ ] `sample_data/demo_logs.json` est importe via `POST /ingest` avant la session pour avoir un jeu de donnees reproductible, quelle que soit la machine.
+- [ ] Le script `send-windows-logs.ps1` a ete teste au moins une fois en complement, si une demonstration avec des logs reels est prevue.
 - [ ] Le plan B est pret: si l'IA distante est indisponible pendant la demo, basculer `AI_PROVIDER=mock` et redemarrer `docker compose up -d api`.

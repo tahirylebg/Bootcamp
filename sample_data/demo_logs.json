@@ -1,0 +1,42 @@
+[
+  {
+    "source": "web-server",
+    "event_type": "failed_login",
+    "severity": "high",
+    "message": "Five failed login attempts for admin",
+    "ip_address": "203.0.113.10",
+    "metadata": {"username": "admin", "attempts": 5}
+  },
+  {
+    "source": "firewall",
+    "event_type": "port_scan",
+    "severity": "medium",
+    "message": "Sequential connection attempts detected on ports 20-25",
+    "ip_address": "198.51.100.23",
+    "metadata": {"ports": [20, 21, 22, 23, 24, 25]}
+  },
+  {
+    "source": "endpoint-av",
+    "event_type": "malware_detected",
+    "severity": "critical",
+    "message": "Trojan.GenericKD signature detected in C:\\Users\\Public\\update.exe",
+    "ip_address": "10.0.0.42",
+    "metadata": {"file": "update.exe", "engine": "endpoint-av"}
+  },
+  {
+    "source": "vpn-gateway",
+    "event_type": "login_success",
+    "severity": "low",
+    "message": "Successful VPN connection from a known device",
+    "ip_address": "192.168.1.15",
+    "metadata": {"device": "laptop-15"}
+  },
+  {
+    "source": "database",
+    "event_type": "privilege_escalation",
+    "severity": "critical",
+    "message": "Service account granted temporary admin role outside change window",
+    "ip_address": "10.0.0.8",
+    "metadata": {"account": "svc-backup", "role": "admin"}
+  }
+]
