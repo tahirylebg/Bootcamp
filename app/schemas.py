@@ -3,7 +3,6 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-
 Severity = Literal["info", "low", "medium", "high", "critical"]
 
 

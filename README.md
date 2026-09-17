@@ -25,7 +25,23 @@ Supprimer aussi les donnees PostgreSQL:
 docker compose down -v
 ```
 
-## 2. Demonstration Swagger
+## 2. Architecture du projet
+
+```text
+app/
+  main.py     routes FastAPI (events, ingestion, analyse, alertes)
+  models.py   modeles SQLAlchemy (Event, Analysis)
+  schemas.py  schemas Pydantic (validation entree/sortie)
+  ai.py       appel du fournisseur IA (deepseek, ollama, mock)
+  db.py       moteur SQLAlchemy et session
+  config.py   configuration via variables d'environnement (.env)
+tests/        tests unitaires pytest
+scripts/      scripts PowerShell (import des logs Windows)
+```
+
+L'API est sans etat: chaque requete ouvre une session SQLAlchemy via `get_db`, et le fournisseur IA est resolu a l'execution depuis `AI_PROVIDER` (voir section 4).
+
+## 3. Demonstration Swagger
 
 1. `GET /health` confirme que l'API fonctionne.
 2. `POST /events` avec cet exemple:
@@ -57,17 +73,19 @@ Cette route cree et conserve automatiquement l'evenement avant son analyse.
 
 Pour analyser les derniers logs deja importes, utiliser `POST /analyze-recent` avec un parametre `limit`, par exemple `limit=20`. La limite est comprise entre 1 et 100.
 
+## 4. Fournisseur IA
+
 Le fournisseur par defaut est DeepSeek. Mettre la cle dans `DEEPSEEK_API_KEY` dans `.env` et conserver `AI_PROVIDER=deepseek`. Le modele utilise par defaut est `deepseek-chat`. Pour tester sans cle, utiliser temporairement `AI_PROVIDER=mock`. Pour Ollama, mettre `AI_PROVIDER=ollama` et verifier que le service Ollama est accessible.
 
-## 3. Architecture reseau
+## 5. Architecture reseau
 
 Les conteneurs `api` et `db` sont sur le reseau Docker `bootcamp_net`. L'API joint PostgreSQL avec le nom de service `db`, jamais avec `localhost`. Le port PostgreSQL n'est pas expose sur l'hote; seul le port Swagger `8000` l'est.
 
-## 4. Formats d'ingestion
+## 6. Formats d'ingestion
 
 `POST /ingest` accepte un JSON (objet ou liste d'objets) ou un CSV avec les colonnes `source,event_type,severity,message,ip_address,metadata`. Les lignes invalides sont rejetees sans arreter les lignes valides.
 
-## 5. Points securite presentes
+## 7. Points securite presentes
 
 - validation stricte des champs avec Pydantic;
 - limite de taille des champs texte et du parametre `limit`;
@@ -76,7 +94,32 @@ Les conteneurs `api` et `db` sont sur le reseau Docker `bootcamp_net`. L'API joi
 - base non exposee directement sur l'hote;
 - fournisseur IA selectionnable sans modifier le code.
 
-## 6. Brancher les logs Windows
+## 8. Tests et qualite
+
+Installer les dependances de developpement dans un environnement virtuel:
+
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -r requirements-dev.txt
+```
+
+Lancer les tests unitaires (aucune base de donnees requise, `app.ai.mock_analysis` et les schemas Pydantic sont testes isolement):
+
+```powershell
+pytest
+```
+
+Verifier le style et les erreurs statiques avec le linter:
+
+```powershell
+ruff check .
+ruff format .
+```
+
+La configuration de pytest et ruff se trouve dans `pyproject.toml`.
+
+## 9. Brancher les logs Windows
 
 Avec Docker demarre, lancer PowerShell dans le dossier du projet:
 
@@ -91,3 +134,14 @@ Le script lit les 50 derniers evenements du journal Windows `System`, les conver
 ```
 
 L'import stocke les logs dans PostgreSQL. Pour analyser ensuite un message, utiliser `POST /analyze-text` dans Swagger. L'automatisation continue peut etre ajoutee avec le Planificateur de taches Windows.
+
+## 10. Check-list Demo Day
+
+Avant la demonstration:
+
+- [ ] `docker compose up --build` demarre sans erreur et `/health` repond `{"status": "ok"}`.
+- [ ] `.env` contient une cle `DEEPSEEK_API_KEY` valide, ou `AI_PROVIDER=mock` en solution de secours si pas de reseau/quota.
+- [ ] `pytest` et `ruff check .` passent tous les deux.
+- [ ] Le script `send-windows-logs.ps1` a ete teste au moins une fois pour avoir des donnees a montrer.
+- [ ] Un jeu d'evenements de demonstration est deja importe (`POST /events` ou `POST /ingest`) pour eviter de saisir des donnees en direct.
+- [ ] Le plan B est pret: si l'IA distante est indisponible pendant la demo, basculer `AI_PROVIDER=mock` et redemarrer `docker compose up -d api`.

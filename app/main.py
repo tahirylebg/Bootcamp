@@ -12,7 +12,6 @@ from app.db import Base, engine, get_db
 from app.models import Analysis, Event
 from app.schemas import AnalysisResponse, EventCreate, EventResponse, IngestResponse, TextAnalysisRequest
 
-
 app = FastAPI(
     title="Bootcamp Security Logs API",
     description="Ingestion, validation and AI-assisted analysis of technical events.",
@@ -70,9 +69,13 @@ def analyze_text(payload: TextAnalysisRequest, database: Session = Depends(get_d
     except (ValueError, json.JSONDecodeError) as error:
         database.rollback()
         raise HTTPException(status_code=502, detail=str(error)) from error
-    analysis = Analysis(event_id=event.id, provider=get_settings().ai_provider,
-                        risk_level=result["risk_level"], summary=result["summary"],
-                        recommendations=result["recommendations"])
+    analysis = Analysis(
+        event_id=event.id,
+        provider=get_settings().ai_provider,
+        risk_level=result["risk_level"],
+        summary=result["summary"],
+        recommendations=result["recommendations"],
+    )
     database.add(analysis)
     database.commit()
     database.refresh(analysis)
@@ -84,22 +87,24 @@ def analyze_recent(
     limit: int = Query(default=10, ge=1, le=100),
     database: Session = Depends(get_db),
 ) -> list[Analysis]:
-    events = list(database.scalars(
-        select(Event).order_by(Event.created_at.desc(), Event.id.desc()).limit(limit)
-    ))
+    events = list(
+        database.scalars(select(Event).order_by(Event.created_at.desc(), Event.id.desc()).limit(limit))
+    )
     analyses = []
     settings = get_settings()
 
     try:
         for event in events:
             result = analyze_event(event, settings)
-            analyses.append(Analysis(
-                event_id=event.id,
-                provider=settings.ai_provider,
-                risk_level=result["risk_level"],
-                summary=result["summary"],
-                recommendations=result["recommendations"],
-            ))
+            analyses.append(
+                Analysis(
+                    event_id=event.id,
+                    provider=settings.ai_provider,
+                    risk_level=result["risk_level"],
+                    summary=result["summary"],
+                    recommendations=result["recommendations"],
+                )
+            )
         database.add_all(analyses)
         database.commit()
         for analysis in analyses:
@@ -142,9 +147,16 @@ def ingest_file(file: UploadFile = File(...), database: Session = Depends(get_db
             if isinstance(record.get("metadata"), str):
                 record["metadata"] = json.loads(record["metadata"] or "{}")
             payload = EventCreate.model_validate(record)
-            database.add(Event(source=payload.source, event_type=payload.event_type,
-                                severity=payload.severity, message=payload.message,
-                                ip_address=payload.ip_address, metadata_json=payload.metadata))
+            database.add(
+                Event(
+                    source=payload.source,
+                    event_type=payload.event_type,
+                    severity=payload.severity,
+                    message=payload.message,
+                    ip_address=payload.ip_address,
+                    metadata_json=payload.metadata,
+                )
+            )
             imported += 1
         except ValueError as error:
             rejected += 1

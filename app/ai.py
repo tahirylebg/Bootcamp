@@ -6,8 +6,8 @@ from openai import OpenAI
 from app.config import Settings
 from app.models import Event
 
-
-SYSTEM_PROMPT = """Tu es un analyste SOC. Analyse l'evenement fourni et reponds uniquement en JSON valide avec:
+SYSTEM_PROMPT = """Tu es un analyste SOC.
+Analyse l'evenement fourni et reponds uniquement en JSON valide avec:
 - risk_level: une valeur parmi low, medium, high, critical
 - summary: une explication courte
 - recommendations: une liste de mesures concretes
@@ -19,7 +19,10 @@ def mock_analysis(event: Event) -> dict:
     return {
         "risk_level": risk,
         "summary": f"Evenement {event.event_type} recu depuis {event.source}.",
-        "recommendations": ["Verifier la source et les journaux associes", "Documenter la decision de traitement"],
+        "recommendations": [
+            "Verifier la source et les journaux associes",
+            "Documenter la decision de traitement",
+        ],
     }
 
 
@@ -27,14 +30,17 @@ def analyze_event(event: Event, settings: Settings) -> dict:
     if settings.ai_provider == "mock":
         return mock_analysis(event)
 
-    prompt = json.dumps({
-        "source": event.source,
-        "event_type": event.event_type,
-        "severity": event.severity,
-        "message": event.message,
-        "ip_address": event.ip_address,
-        "metadata": event.metadata_json,
-    }, ensure_ascii=True)
+    prompt = json.dumps(
+        {
+            "source": event.source,
+            "event_type": event.event_type,
+            "severity": event.severity,
+            "message": event.message,
+            "ip_address": event.ip_address,
+            "metadata": event.metadata_json,
+        },
+        ensure_ascii=True,
+    )
 
     if settings.ai_provider == "deepseek":
         if not settings.deepseek_api_key:
@@ -51,8 +57,15 @@ def analyze_event(event: Event, settings: Settings) -> dict:
     if settings.ai_provider == "ollama":
         response = httpx.post(
             f"{settings.ollama_url.rstrip('/')}/api/chat",
-            json={"model": settings.ollama_model, "stream": False, "format": "json",
-                  "messages": [{"role": "system", "content": SYSTEM_PROMPT}, {"role": "user", "content": prompt}]},
+            json={
+                "model": settings.ollama_model,
+                "stream": False,
+                "format": "json",
+                "messages": [
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": prompt},
+                ],
+            },
             timeout=60,
         )
         response.raise_for_status()
