@@ -93,7 +93,9 @@ Les conteneurs `api` et `db` sont sur le reseau Docker `bootcamp_net`. L'API joi
 
 `POST /ingest` accepte un JSON (objet ou liste d'objets) ou un CSV avec les colonnes `source,event_type,severity,message,ip_address,metadata`. Les lignes invalides sont rejetees sans arreter les lignes valides.
 
-## 7. Points securite presentes
+## 7. Audit de securite
+
+### Mesures en place
 
 - validation stricte des champs avec Pydantic;
 - limite de taille des champs texte et du parametre `limit`;
@@ -101,6 +103,17 @@ Les conteneurs `api` et `db` sont sur le reseau Docker `bootcamp_net`. L'API joi
 - requetes SQLAlchemy parametrees;
 - base non exposee directement sur l'hote;
 - fournisseur IA selectionnable sans modifier le code.
+
+### Risques identifies et remediations prioritaires
+
+| Priorite | Risque | Remediation proposee |
+| --- | --- | --- |
+| P1 | Aucune authentification sur les routes: toute personne atteignant le port `8000` peut lire/creer des evenements et declencher des appels IA factures (`/analyze-text`, `/analyze-recent`). | Ajouter une cle API ou un token (en-tete `Authorization`) verifie par une dependance FastAPI avant d'exposer le service hors d'un reseau de confiance. |
+| P1 | Aucune limite de debit sur `/analyze-text` et `/analyze-recent`: un appelant peut multiplier les appels au fournisseur IA (cout, quota, deni de service applicatif). | Ajouter un rate limiting (ex. `slowapi`) sur les routes d'analyse, ou une file d'attente avec quota par client. |
+| P2 | `POST /ingest` lit tout le fichier en memoire (`file.file.read()`) sans limite de taille: un fichier volumineux peut epuiser la memoire du conteneur. | Rejeter les fichiers au-dela d'une taille maximale (ex. verifier `Content-Length` ou lire par blocs) avant traitement. |
+| P2 | Le contenu des evenements (`message`, `metadata`) est envoye tel quel a un fournisseur IA externe (DeepSeek): risque de fuite de donnees sensibles si les logs en contiennent. | Documenter cette limite aupres des utilisateurs, et ajouter un filtrage/masquage des donnees sensibles (IP internes, identifiants) avant l'envoi au fournisseur. |
+| P3 | Le conteneur `api` s'execute en tant que root (`Dockerfile` sans utilisateur dedie). | Ajouter un utilisateur non privilegie dans le `Dockerfile` et l'utiliser via `USER`. |
+| P3 | Les erreurs du fournisseur IA sont renvoyees telles quelles au client (`HTTPException(..., detail=str(error))`), ce qui peut exposer des details internes. | Journaliser l'erreur cote serveur et renvoyer un message generique au client. |
 
 ## 8. Tests et qualite
 
